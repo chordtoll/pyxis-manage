@@ -8,6 +8,7 @@ arch=("x86_64")
 makedepends=("cargo")
 url="https://github.com/chordtoll/pyxis-manage"
 source=("$pkgname-$pkgver.tar.gz::https://static.crates.io/crates/$pkgname/$pkgname-$pkgver.crate")
+sha256sums=('9ec08f7611386f83908a66b66c016f6f3cf72c0f722b03c0a30a244e31b244bf')
 
 prepare() {
     cd "$pkgname-$pkgver"
