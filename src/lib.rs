@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::path::PathBuf;
 
 mod chroot;
 mod hookfile;
@@ -70,19 +70,20 @@ pub fn pyxis_parcel_build_named(package: &str) {
 
 fn pyxis_parcel_build(provider: ParcelProvider, package: &str) {
     match provider {
-        ParcelProvider::Arch => {
-            providers::alpm::pyxis_parcel_build_arch(package, &mut HashSet::new())
-        }
-        ParcelProvider::Local => unimplemented!(),
+        ParcelProvider::Arch => providers::alpm::parcel_build(package),
+        ParcelProvider::Local => providers::local::parcel_build(package),
     }
 }
 
 fn get_deps(provider: ParcelProvider, package: String) -> Vec<(ParcelProvider, String)> {
     match provider {
-        ParcelProvider::Arch => providers::alpm::alpm_get_deps(&package)
+        ParcelProvider::Arch => providers::alpm::get_deps(&package)
             .iter()
             .map(|x| (provider, x.to_owned()))
             .collect(),
-        ParcelProvider::Local => unimplemented!(),
+        ParcelProvider::Local => providers::local::get_deps(&package)
+            .iter()
+            .map(|x| get_provider(x))
+            .collect(),
     }
 }

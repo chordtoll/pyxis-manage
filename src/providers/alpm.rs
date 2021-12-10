@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::BTreeMap,
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
@@ -66,7 +66,7 @@ pub fn alpm_resolve_package(package: &str) -> Vec<String> {
     }))
 }
 
-pub fn alpm_get_deps(package: &str) -> Vec<String> {
+pub fn get_deps(package: &str) -> Vec<String> {
     let pkb = Box::new(package.to_owned());
     with_alpm(Box::new(|alpm: &alpm::Alpm| {
         let mut res = Vec::new();
@@ -140,7 +140,7 @@ fn parcel_from_pacman<R: Sized + std::io::Read>(
 
     let mut parcel = Parcel::new();
 
-    parcel.metadata.depends = alpm_get_deps(package)
+    parcel.metadata.depends = get_deps(package)
         .iter()
         .map(|x| String::from("arch|") + x)
         .collect();
@@ -158,12 +158,16 @@ fn parcel_from_pacman<R: Sized + std::io::Read>(
         rdev:  0,
     };
     let pyxis_dir = parcel.add_directory(attr, BTreeMap::new());
+    let provider_dir = parcel.add_directory(attr, BTreeMap::new());
     let parcel_dir = parcel.add_directory(attr, BTreeMap::new());
     parcel
         .insert_dirent(1, std::ffi::OsString::from(".PYXIS"), pyxis_dir)
         .unwrap();
     parcel
-        .insert_dirent(pyxis_dir, std::ffi::OsString::from(package), parcel_dir)
+        .insert_dirent(pyxis_dir, std::ffi::OsString::from("arch"), provider_dir)
+        .unwrap();
+    parcel
+        .insert_dirent(provider_dir, std::ffi::OsString::from(package), parcel_dir)
         .unwrap();
 
     for ent in archive.entries().unwrap() {
@@ -271,17 +275,8 @@ fn parcel_from_pacman<R: Sized + std::io::Read>(
     parcel.store(file).unwrap();
 }
 
-pub fn pyxis_parcel_build_arch(package: &str, visited: &mut HashSet<String>) {
+pub fn parcel_build(package: &str) {
     let package = &alpm_find_satisfier(package)[0];
-
-    if visited.contains(package) {
-        return;
-    }
-    visited.insert(package.to_string());
-
-    /*for dep in &alpm_get_deps(package) {
-        pyxis_parcel_build_arch(dep, visited);
-    }*/
 
     if exists_parcel(ParcelProvider::Arch, package) {
         return;
