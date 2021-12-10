@@ -120,9 +120,10 @@ pub fn parse_hook(f: &mut File) -> Hook {
         }
 
         let ls: Vec<&str> = line.split('=').collect();
-        if ls.len() == 2 {
+        if ls.len() >= 2 {
             let k = ls[0].trim();
-            let v = ls[1].trim();
+            let vs = ls[1..].join("=").trim().to_owned();
+            let v = vs.as_str();
             match section {
                 0 => unimplemented!("Outside of block"),
                 1 => match k {
@@ -170,7 +171,7 @@ pub fn parse_hook(f: &mut File) -> Hook {
             continue;
         }
 
-        unimplemented!("Unexpected line: {}", line);
+        unimplemented!("Unexpected line: '{}'", line);
     }
 
     if ct.flavor != HookTriggerFlavor::None {
