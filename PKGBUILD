@@ -29,5 +29,6 @@ package() {
         -executable \
         -type f \
         -exec install -Dm0755 -t "$pkgdir/usr/bin/" {} +
+    install -Dm644 LICENSE.txt "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 }
 
