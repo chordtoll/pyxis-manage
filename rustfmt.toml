@@ -1,0 +1,7 @@
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+
+report_fixme = "Unnumbered"
+report_todo = "Unnumbered"
+
+struct_field_align_threshold = 20
