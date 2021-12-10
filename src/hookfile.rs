@@ -6,14 +6,14 @@ use std::{
 #[derive(Eq, PartialEq, Debug)]
 pub struct Hook {
     pub triggers: Vec<HookTrigger>,
-    pub action: HookAction,
+    pub action:   HookAction,
 }
 
 impl Hook {
     pub fn new() -> Hook {
         Hook {
             triggers: Vec::new(),
-            action: HookAction::new(),
+            action:   HookAction::new(),
         }
     }
 }
@@ -21,26 +21,26 @@ impl Hook {
 #[derive(Eq, PartialEq, Debug)]
 pub struct HookTrigger {
     pub operations: Vec<HookTriggerOperation>,
-    pub flavor: HookTriggerFlavor,
-    pub targets: Vec<String>,
+    pub flavor:     HookTriggerFlavor,
+    pub targets:    Vec<String>,
 }
 
 impl HookTrigger {
     pub fn new() -> HookTrigger {
         HookTrigger {
             operations: Vec::new(),
-            flavor: HookTriggerFlavor::None,
-            targets: Vec::new(),
+            flavor:     HookTriggerFlavor::None,
+            targets:    Vec::new(),
         }
     }
 }
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct HookAction {
-    pub description: Option<String>,
-    pub when: HookActionWhen,
-    pub exec: String,
-    pub depends: Vec<String>,
+    pub description:   Option<String>,
+    pub when:          HookActionWhen,
+    pub exec:          String,
+    pub depends:       Vec<String>,
     pub abort_on_fail: bool,
     pub needs_targets: bool,
 }
@@ -48,10 +48,10 @@ pub struct HookAction {
 impl HookAction {
     pub fn new() -> HookAction {
         HookAction {
-            description: None,
-            when: HookActionWhen::None,
-            exec: String::new(),
-            depends: Vec::new(),
+            description:   None,
+            when:          HookActionWhen::None,
+            exec:          String::new(),
+            depends:       Vec::new(),
             abort_on_fail: false,
             needs_targets: false,
         }
