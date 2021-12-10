@@ -11,14 +11,14 @@ repository = "https://github.com/chordtoll/pyxis-manage"
 arch = ["x86_64"]
 
 [dependencies]
-clap = "2.33.3"
-alpm = "2.1.3"
+clap = "2.34.0"
+alpm = "2.2.0"
 lazy_static = "1.4.0"
 curl = "0.4.41"
 zstd = "0.9.0"
 xz = "0.1.0"
 tar = "0.4.37"
-pyxis-parcel = "0.1.1"
+pyxis-parcel = "0.3.0"
 passwd = "0.0.1"
 nix = "0.23.0"
 indicatif = "0.16.2"
