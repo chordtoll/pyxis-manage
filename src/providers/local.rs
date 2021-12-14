@@ -1,9 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    ffi::OsString,
-    fs::File,
-    path::{Path, PathBuf},
-};
+use std::{collections::BTreeMap, ffi::OsString, fs::File, path::PathBuf};
 
 use pyxis_parcel::{InodeAttr, Parcel};
 
