@@ -129,6 +129,7 @@ pub fn parse_hook(f: &mut File) -> Hook {
                 1 => match k {
                     "Type" => match v {
                         "Path" => ct.flavor = HookTriggerFlavor::Path,
+                        "File" => ct.flavor = HookTriggerFlavor::Path,
                         "Package" => ct.flavor = HookTriggerFlavor::Package,
                         _ => unimplemented!("Unknown value for trigger block {}: {}", k, v),
                     },
