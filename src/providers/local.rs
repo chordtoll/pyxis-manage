@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, ffi::OsString, fs::File, path::PathBuf};
 
-use pyxis_parcel::{InodeAttr, Parcel};
+use pyxis_parcel::{InodeAttr, InodeKind, ParcelHandle, ReaderWriter};
 
 use super::recipe::Recipe;
 use crate::{get_home, get_parcel_path, ParcelProvider};
@@ -25,7 +25,7 @@ pub fn get_deps(package: &str) -> Vec<String> {
     recipe.depends
 }
 
-pub fn get_version(package: &str) -> String {
+pub fn _get_version(package: &str) -> String {
     let recipe = load_recipe(package);
     recipe.version
 }
@@ -33,10 +33,10 @@ pub fn get_version(package: &str) -> String {
 pub fn parcel_build(package: &str) {
     let recipe = load_recipe(package);
 
-    let mut parcel = Parcel::new();
+    let mut parcel = ParcelHandle::new();
 
-    parcel.metadata.depends = recipe.depends;
-    parcel.metadata.version = recipe.version;
+    parcel.metadata().depends = recipe.depends;
+    parcel.metadata().version = recipe.version;
 
     let time = std::time::SystemTime::now();
     let attr = InodeAttr {
@@ -53,13 +53,28 @@ pub fn parcel_build(package: &str) {
     let provider_dir = parcel.add_directory(attr, BTreeMap::new());
     let parcel_dir = parcel.add_directory(attr, BTreeMap::new());
     parcel
-        .insert_dirent(1, std::ffi::OsString::from(".PYXIS"), pyxis_dir)
+        .insert_dirent(
+            1,
+            std::ffi::OsString::from(".PYXIS"),
+            pyxis_dir,
+            InodeKind::Directory,
+        )
         .unwrap();
     parcel
-        .insert_dirent(pyxis_dir, std::ffi::OsString::from("local"), provider_dir)
+        .insert_dirent(
+            pyxis_dir,
+            std::ffi::OsString::from("local"),
+            provider_dir,
+            InodeKind::Directory,
+        )
         .unwrap();
     parcel
-        .insert_dirent(provider_dir, std::ffi::OsString::from(package), parcel_dir)
+        .insert_dirent(
+            provider_dir,
+            std::ffi::OsString::from(package),
+            parcel_dir,
+            InodeKind::Directory,
+        )
         .unwrap();
 
     for (source, dest) in recipe.files {
@@ -72,7 +87,9 @@ pub fn parcel_build(package: &str) {
             pathsofar.push(comp);
             if parcel.select(pathsofar.clone()) == None {
                 let dir = parcel.add_directory(attr, BTreeMap::new());
-                parcel.insert_dirent(parent, comp.to_owned(), dir).unwrap();
+                parcel
+                    .insert_dirent(parent, comp.to_owned(), dir, InodeKind::Directory)
+                    .unwrap();
             }
             parent = parcel.select(pathsofar.clone()).unwrap();
         }
@@ -88,6 +105,7 @@ pub fn parcel_build(package: &str) {
                 parent,
                 OsString::from(PathBuf::from(dest).file_name().unwrap()),
                 ino,
+                InodeKind::RegularFile,
             )
             .unwrap();
     }
@@ -103,12 +121,18 @@ pub fn parcel_build(package: &str) {
             )
             .unwrap();
         parcel
-            .insert_dirent(parcel_dir, OsString::from(".INSTALL"), ino)
+            .insert_dirent(
+                parcel_dir,
+                OsString::from(".INSTALL"),
+                ino,
+                InodeKind::RegularFile,
+            )
             .unwrap();
     }
 
     let parcelpath = get_parcel_path(ParcelProvider::Local, package);
     std::fs::create_dir_all(parcelpath.parent().unwrap()).unwrap();
     let file = File::create(parcelpath).unwrap();
-    parcel.store(file).unwrap();
+    parcel.set_file(Box::new(ReaderWriter::new(file)));
+    parcel.store().unwrap();
 }

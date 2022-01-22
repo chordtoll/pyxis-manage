@@ -7,14 +7,15 @@ use std::{
 };
 
 use indexmap::IndexSet;
-use pyxis_parcel::{InodeKind, Parcel};
+use pyxis_parcel::{InodeKind, ParcelHandle, ReaderWriter};
 use sys_mount::Unmount;
 
 use crate::{
     chroot::run_in_chroot, get_deps, get_parcel_path, get_provider, hookfile, pyxis_parcel_build,
+    ParcelProvider,
 };
 
-pub fn pyxis_image_build(manifest: &str) {
+pub fn get_image_packages(manifest: &str) -> IndexSet<(ParcelProvider, String)> {
     let f = File::open(manifest).unwrap();
     let br = BufReader::new(f);
 
@@ -55,6 +56,11 @@ pub fn pyxis_image_build(manifest: &str) {
     for (provider, package) in &to_install {
         pyxis_parcel_build(*provider, package);
     }
+    to_install
+}
+
+pub fn pyxis_image_build(manifest: &str) {
+    let to_install = get_image_packages(manifest);
 
     let sty = indicatif::ProgressStyle::default_bar()
         .template("[{elapsed_precise}] {wide_bar} {pos:>5}/{len:5} {msg:>25}")
@@ -79,10 +85,10 @@ pub fn pyxis_image_build(manifest: &str) {
         pb.tick();
         let f = File::open(get_parcel_path(*provider, package))
             .unwrap_or_else(|_| panic!("Could not find parcel {}", package));
-        let mut reader = BufReader::new(f);
-        let parcel = Parcel::load(&mut reader).unwrap();
+        let reader = Box::new(ReaderWriter::new(f));
+        let mut parcel = ParcelHandle::load(reader).unwrap();
         let mut f = File::open(get_parcel_path(*provider, package)).unwrap();
-        extract_parcel(&mut f, &parcel, 1, "temp");
+        extract_parcel(&mut f, &mut parcel, 1, "temp");
         pb.inc(1);
     }
     pb.finish();
@@ -249,7 +255,7 @@ pub fn pyxis_image_build(manifest: &str) {
     std::mem::drop(mount);
 }
 
-fn extract_parcel(pf: &mut File, parcel: &Parcel, ino: u64, ex_dir: &str) {
+fn extract_parcel(pf: &mut File, parcel: &mut ParcelHandle, ino: u64, ex_dir: &str) {
     if std::fs::metadata(ex_dir).is_err() {
         std::fs::create_dir(ex_dir).unwrap();
     }
@@ -273,8 +279,7 @@ fn extract_parcel(pf: &mut File, parcel: &Parcel, ino: u64, ex_dir: &str) {
             InodeKind::RegularFile => {
                 let fnm = String::from(ex_dir) + "/" + &name;
                 let mut f = File::create(fnm.clone()).unwrap();
-                f.write_all(&parcel.read(pf, ino, 0, None).unwrap())
-                    .unwrap();
+                f.write_all(&parcel.read(ino, 0, None).unwrap()).unwrap();
                 let attr = parcel.getattr(ino).unwrap();
                 nix::unistd::chown(
                     fnm.as_str(),
@@ -297,6 +302,9 @@ fn extract_parcel(pf: &mut File, parcel: &Parcel, ino: u64, ex_dir: &str) {
                 .unwrap();
             }
             InodeKind::CharDevice => {
+                unimplemented!();
+            }
+            InodeKind::Whiteout => {
                 unimplemented!();
             }
         }

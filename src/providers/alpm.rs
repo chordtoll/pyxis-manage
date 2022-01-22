@@ -8,7 +8,7 @@ use std::{
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use pyxis_parcel::{InodeAttr, Parcel};
+use pyxis_parcel::{InodeAttr, InodeKind, ParcelHandle, ReaderWriter};
 
 use crate::{exists_parcel, get_parcel_path, ParcelProvider};
 
@@ -100,34 +100,54 @@ pub fn alpm_get_version(package: &str) -> Vec<String> {
 
 pub fn alpm_fetch(package: &str) -> (File, String) {
     println!("Fetching {}", package);
-    let pkg = alpm_resolve_package(package);
-    let repo = &pkg[0];
-    let filename = &pkg[1];
+    match package {
+        "linux" => {
+            let file =
+                File::open("/home/asent/build/linux/linux-5.16-1-x86_64.pkg.tar.zst").unwrap();
+            (file, String::from("zst"))
+        }
+        "linux-docs" => {
+            let file =
+                File::open("/home/asent/build/linux/linux-docs-5.16-1-x86_64.pkg.tar.zst").unwrap();
+            (file, String::from("zst"))
+        }
+        "linux-headers" => {
+            let file =
+                File::open("/home/asent/build/linux/linux-headers-5.16-1-x86_64.pkg.tar.zst")
+                    .unwrap();
+            (file, String::from("zst"))
+        }
+        _ => {
+            let pkg = alpm_resolve_package(package);
+            let repo = &pkg[0];
+            let filename = &pkg[1];
 
-    println!("{}", filename);
+            println!("{}", filename);
 
-    let mut easy = curl::easy::Easy::new();
-    easy.url(&format!(
-        "http://archrepo.calamityconductor.com/{}/os/x86_64/{}",
-        repo, filename
-    ))
-    .unwrap();
+            let mut easy = curl::easy::Easy::new();
+            easy.url(&format!(
+                "http://archrepo.calamityconductor.com/{}/os/x86_64/{}",
+                repo, filename
+            ))
+            .unwrap();
+            easy.follow_location(true).unwrap();
 
-    let mut file = tempfile::tempfile().unwrap();
+            let mut file = tempfile::tempfile().unwrap();
 
-    let mut transfer = easy.transfer();
-    transfer
-        .write_function(|data| {
-            file.write_all(data).unwrap();
-            Ok(data.len())
-        })
-        .unwrap();
-    transfer.perform().unwrap();
-    std::mem::drop(transfer);
+            let mut transfer = easy.transfer();
+            transfer
+                .write_function(|data| {
+                    file.write_all(data).unwrap();
+                    Ok(data.len())
+                })
+                .unwrap();
+            transfer.perform().unwrap();
+            std::mem::drop(transfer);
 
-    file.seek(SeekFrom::Start(0)).unwrap();
-
-    (file, filename.split('.').next_back().unwrap().to_owned())
+            file.seek(SeekFrom::Start(0)).unwrap();
+            (file, filename.split('.').next_back().unwrap().to_owned())
+        }
+    }
 }
 
 fn parcel_from_pacman<R: Sized + std::io::Read>(
@@ -138,13 +158,13 @@ fn parcel_from_pacman<R: Sized + std::io::Read>(
     let mut dir_map: BTreeMap<PathBuf, u64> = BTreeMap::new();
     dir_map.insert(PathBuf::from("/"), 1);
 
-    let mut parcel = Parcel::new();
+    let mut parcel = ParcelHandle::new();
 
-    parcel.metadata.depends = get_deps(package)
+    parcel.metadata().depends = get_deps(package)
         .iter()
         .map(|x| String::from("arch|") + x)
         .collect();
-    parcel.metadata.version = alpm_get_version(package)[0].clone();
+    parcel.metadata().version = alpm_get_version(package)[0].clone();
 
     let time = std::time::SystemTime::now();
     let attr = InodeAttr {
@@ -161,13 +181,28 @@ fn parcel_from_pacman<R: Sized + std::io::Read>(
     let provider_dir = parcel.add_directory(attr, BTreeMap::new());
     let parcel_dir = parcel.add_directory(attr, BTreeMap::new());
     parcel
-        .insert_dirent(1, std::ffi::OsString::from(".PYXIS"), pyxis_dir)
+        .insert_dirent(
+            1,
+            std::ffi::OsString::from(".PYXIS"),
+            pyxis_dir,
+            InodeKind::Directory,
+        )
         .unwrap();
     parcel
-        .insert_dirent(pyxis_dir, std::ffi::OsString::from("arch"), provider_dir)
+        .insert_dirent(
+            pyxis_dir,
+            std::ffi::OsString::from("arch"),
+            provider_dir,
+            InodeKind::Directory,
+        )
         .unwrap();
     parcel
-        .insert_dirent(provider_dir, std::ffi::OsString::from(package), parcel_dir)
+        .insert_dirent(
+            provider_dir,
+            std::ffi::OsString::from(package),
+            parcel_dir,
+            InodeKind::Directory,
+        )
         .unwrap();
 
     for ent in archive.entries().unwrap() {
@@ -202,10 +237,20 @@ fn parcel_from_pacman<R: Sized + std::io::Read>(
                     .unwrap();
                 match (parent_inode, entry_name.to_str().unwrap()) {
                     (1, ".INSTALL" | ".BUILDINFO" | ".MTREE" | ".PKGINFO") => parcel
-                        .insert_dirent(parcel_dir, entry_name.to_owned(), ino)
+                        .insert_dirent(
+                            parcel_dir,
+                            entry_name.to_owned(),
+                            ino,
+                            InodeKind::RegularFile,
+                        )
                         .unwrap(),
                     _ => parcel
-                        .insert_dirent(parent_inode, entry_name.to_owned(), ino)
+                        .insert_dirent(
+                            parent_inode,
+                            entry_name.to_owned(),
+                            ino,
+                            InodeKind::RegularFile,
+                        )
                         .unwrap(),
                 }
             }
@@ -220,7 +265,12 @@ fn parcel_from_pacman<R: Sized + std::io::Read>(
                     .into();
                 let ino = parcel.add_hardlink(link_name).unwrap();
                 parcel
-                    .insert_dirent(parent_inode, entry_name.to_owned(), ino)
+                    .insert_dirent(
+                        parent_inode,
+                        entry_name.to_owned(),
+                        ino,
+                        InodeKind::RegularFile,
+                    )
                     .unwrap();
             }
             [b'2'] => {
@@ -246,7 +296,7 @@ fn parcel_from_pacman<R: Sized + std::io::Read>(
                     .add_symlink(link_name, attr, BTreeMap::new())
                     .unwrap();
                 parcel
-                    .insert_dirent(parent_inode, entry_name.to_owned(), ino)
+                    .insert_dirent(parent_inode, entry_name.to_owned(), ino, InodeKind::Symlink)
                     .unwrap();
             }
             [b'5'] => {
@@ -262,7 +312,12 @@ fn parcel_from_pacman<R: Sized + std::io::Read>(
                 };
                 let ino = parcel.add_directory(attr, BTreeMap::new());
                 parcel
-                    .insert_dirent(parent_inode, entry_name.to_owned(), ino)
+                    .insert_dirent(
+                        parent_inode,
+                        entry_name.to_owned(),
+                        ino,
+                        InodeKind::Directory,
+                    )
                     .unwrap();
                 dir_map.insert(entry_path, ino);
             }
@@ -272,7 +327,8 @@ fn parcel_from_pacman<R: Sized + std::io::Read>(
     let parcelpath = get_parcel_path(provider, package);
     std::fs::create_dir_all(parcelpath.parent().unwrap()).unwrap();
     let file = File::create(parcelpath).unwrap();
-    parcel.store(file).unwrap();
+    parcel.set_file(Box::new(ReaderWriter::new(file)));
+    parcel.store().unwrap();
 }
 
 pub fn parcel_build(package: &str) {

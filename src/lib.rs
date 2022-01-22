@@ -5,7 +5,7 @@ mod hookfile;
 mod imagebuild;
 mod providers;
 
-pub use imagebuild::pyxis_image_build;
+pub use imagebuild::{get_image_packages, pyxis_image_build};
 
 pub fn get_user() -> String {
     if let Ok(u) = std::env::var("SUDO_USER") {
@@ -19,7 +19,7 @@ pub fn get_home() -> PathBuf {
     PathBuf::from(passwd::Passwd::from_name(&get_user()).unwrap().home_dir)
 }
 
-fn get_parcel_path(provider: ParcelProvider, package: &str) -> PathBuf {
+pub fn get_parcel_path(provider: ParcelProvider, package: &str) -> PathBuf {
     let mut buf = get_home();
     buf.push(".pyxis/parcel/");
     buf.push(provider.as_str());
@@ -32,9 +32,10 @@ fn exists_parcel(provider: ParcelProvider, package: &str) -> bool {
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Copy, Clone)]
-enum ParcelProvider {
+pub enum ParcelProvider {
     Arch,
     Local,
+    Upper,
 }
 
 impl ParcelProvider {
@@ -42,6 +43,7 @@ impl ParcelProvider {
         match self {
             ParcelProvider::Arch => "arch",
             ParcelProvider::Local => "local",
+            ParcelProvider::Upper => "Upper",
         }
     }
 }
@@ -72,6 +74,7 @@ fn pyxis_parcel_build(provider: ParcelProvider, package: &str) {
     match provider {
         ParcelProvider::Arch => providers::alpm::parcel_build(package),
         ParcelProvider::Local => providers::local::parcel_build(package),
+        ParcelProvider::Upper => panic!(),
     }
 }
 
@@ -85,5 +88,6 @@ fn get_deps(provider: ParcelProvider, package: String) -> Vec<(ParcelProvider, S
             .iter()
             .map(|x| get_provider(x))
             .collect(),
+        ParcelProvider::Upper => panic!(),
     }
 }
