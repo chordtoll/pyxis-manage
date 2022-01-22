@@ -11,8 +11,8 @@ repository = "https://github.com/chordtoll/pyxis-manage"
 arch = ["x86_64"]
 
 [dependencies]
-clap = "2.34.0"
 alpm = "2.2.0"
+clap = { version = "3.0.10", features = ["cargo"] }
 lazy_static = "1.4.0"
 curl = "0.4.41"
 zstd = "0.9.0"
